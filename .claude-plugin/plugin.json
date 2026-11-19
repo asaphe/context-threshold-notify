@@ -1,0 +1,43 @@
+{
+  "name": "context-threshold-notify",
+  "description": "A clickable macOS notification when a Claude Code session's context passes a token threshold. Clicking it brings that session's terminal tab to the front.",
+  "version": "0.2.1",
+  "author": {
+    "name": "asaphe",
+    "url": "https://github.com/asaphe"
+  },
+  "homepage": "https://github.com/asaphe/context-threshold-notify",
+  "repository": "https://github.com/asaphe/context-threshold-notify",
+  "license": "MIT",
+  "keywords": [
+    "context",
+    "notification",
+    "macos",
+    "hooks",
+    "terminal"
+  ],
+  "icon": ".claude-plugin/icon.png",
+  "network": {
+    "hosts": []
+  },
+  "userConfig": {
+    "window_tokens": {
+      "type": "string",
+      "title": "Context window (tokens)",
+      "description": "Your model's context window, e.g. 200000 or 1000000. Empty guesses it: a model name with [1m] means 1000000, anything else 200000 (see README).",
+      "default": ""
+    },
+    "percent": {
+      "type": "string",
+      "title": "Notify at percent of window",
+      "description": "Whole number from 1 to 100, no leading zero.",
+      "default": "50"
+    },
+    "threshold_tokens": {
+      "type": "string",
+      "title": "Absolute threshold (tokens)",
+      "description": "Overrides window and percent when set, e.g. 500000.",
+      "default": ""
+    }
+  }
+}

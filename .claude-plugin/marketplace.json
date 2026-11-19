@@ -1,0 +1,15 @@
+{
+  "name": "context-threshold-notify",
+  "description": "A clickable macOS notification when a Claude Code session's context passes a token threshold.",
+  "owner": {
+    "name": "asaphe",
+    "url": "https://github.com/asaphe"
+  },
+  "plugins": [
+    {
+      "name": "context-threshold-notify",
+      "source": "./",
+      "description": "A clickable macOS notification when a Claude Code session's context passes a token threshold."
+    }
+  ]
+}
