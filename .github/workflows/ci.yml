@@ -27,5 +27,6 @@ jobs:
         with:
           persist-credentials: false
       - if: runner.os == 'Linux'
-        run: shellcheck -s sh -S warning scripts/*.sh tests/run.sh
+        run: shellcheck -s sh -S warning scripts/*.sh tests/*.sh .github/scripts/*.sh
       - run: sh tests/run.sh
+      - run: sh tests/dco.sh

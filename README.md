@@ -59,7 +59,8 @@ Requires `sh`, `sed`, `grep` and `tail`. It uses `jq` when available and falls b
 
 ```sh
 sh tests/run.sh
-shellcheck -s sh -S warning scripts/*.sh tests/run.sh
+sh tests/dco.sh
+shellcheck -s sh -S warning scripts/*.sh tests/*.sh .github/scripts/*.sh
 ```
 
 CI runs the tests on macOS and Linux, shellcheck on Linux, and a Gitleaks secret scan, for pull requests and pushes to `main`; pull requests also get a DCO sign-off check. See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).

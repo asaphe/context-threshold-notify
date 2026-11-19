@@ -15,13 +15,14 @@ the change under this project's license (MIT). See
 [developercertificate.org](https://developercertificate.org/) for the exact
 text you're certifying.
 
-The `DCO` check fails a pull request with an unsigned commit; Dependabot's commits are exempt.
+The `DCO` check fails a pull request with a commit whose `Signed-off-by` names neither the commit's author nor its committer email (case-insensitive); merge commits and Dependabot's pull requests are exempt.
 
 ## Before opening a PR
 
 ```sh
 sh tests/run.sh
-shellcheck -s sh -S warning scripts/*.sh tests/run.sh
+sh tests/dco.sh
+shellcheck -s sh -S warning scripts/*.sh tests/*.sh .github/scripts/*.sh
 claude plugin validate .
 ```
 
