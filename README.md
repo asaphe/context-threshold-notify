@@ -53,7 +53,7 @@ Hooks on `PostToolUse` and `Stop` read the session's transcript. They take the l
 
 Each session notifies once per climb: when context falls below 80% of the threshold (for example after `/compact`), the hook re-arms and notifies again the next time it passes the threshold. The only state is one empty marker file per session that is currently past the threshold.
 
-Requires `sh`, `sed`, `grep` and `tail`. It uses `jq` when available and falls back to `sed` parsing otherwise.
+Requires `sh`, `awk`, `sed`, `grep` and `tail`. It uses `jq` when available and falls back to `sed` parsing otherwise. Because it runs after every tool call, a call that does not notify starts six processes with `jq` (`sh`, `uname`, `tail`, `awk` and two `jq`), plus one `awk` over the settings files when it guesses the window at 200k tokens or fewer and neither the transcript's `requestedModel` nor `ANTHROPIC_MODEL` already settles it.
 
 ## Test
 
