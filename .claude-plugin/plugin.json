@@ -1,7 +1,7 @@
 {
   "name": "context-threshold-notify",
   "description": "A clickable macOS notification when a Claude Code session's context passes a token threshold. Clicking it brings that session's terminal tab to the front.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "author": {
     "name": "asaphe",
     "url": "https://github.com/asaphe"

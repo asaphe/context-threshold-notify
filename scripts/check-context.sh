@@ -1,15 +1,18 @@
 #!/bin/sh
 # PostToolUse/Stop hook: one notification per climb past the context threshold (see README § Configure); never blocks.
 [ "$(uname)" = Darwin ] || exit 0
-input=$(cat)
+nl='
+'
 if command -v jq >/dev/null 2>&1; then
   has_jq=1
-  fields=$(printf '%s' "$input" | jq -r '.session_id // "", .transcript_path // "", .cwd // ""' 2>/dev/null) || exit 0
-  sid=$(printf '%s\n' "$fields" | sed -n 1p)
-  tp=$(printf '%s\n' "$fields" | sed -n 2p)
-  cwd=$(printf '%s\n' "$fields" | sed -n 3p)
+  # The trailing "." keeps the newlines in place when cwd is empty, since $(...) strips trailing ones.
+  fields=$(jq -r '(.session_id, .transcript_path, .cwd | . // "" | tostring), "."' 2>/dev/null) || exit 0
+  sid=${fields%%"$nl"*}; fields=${fields#*"$nl"}
+  tp=${fields%%"$nl"*}; fields=${fields#*"$nl"}
+  cwd=${fields%%"$nl"*}
 else
   has_jq=""
+  input=$(cat)
   # Top-level keys precede tool_input/tool_response, so the first match is the hook's own field.
   field() { printf '%s' "$input" | grep -o "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | head -n 1 | sed 's/.*:[[:space:]]*"\(.*\)"$/\1/'; }
   sid=$(field session_id)
@@ -20,20 +23,20 @@ case $sid in ''|*[!A-Za-z0-9_-]*) exit 0 ;; esac
 [ -f "$tp" ] || exit 0
 
 state=${CONTEXT_THRESHOLD_NOTIFY_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/context-threshold-notify}
-size=$(wc -c < "$tp" | tr -d ' '); size=${size:-0}
-tail_window() { if [ "$1" -lt "$size" ]; then tail -c "$1" "$tp" | sed 1d; else cat "$tp"; fi; }  # a cut window's first line may be partial
+# Reads one byte past the window: more than $n bytes read means the window was cut, so its first line may be partial.
+pick='{ t += length($0) + 1 } /"type":"assistant"/ && !/"isSidechain":true/ { last = $0; at = NR } END { if (at && !(at == 1 && t > n)) print last }'
 num() { v=$(printf '%s' "$line" | sed -n "s/.*\"$1\":\([0-9][0-9]*\).*/\1/p"); echo "${v:-0}"; }
-tokens=""
+tokens="" line="" rmodel=""
 for bytes in 262144 4194304; do
-  line=$(tail_window "$bytes" | grep '"type":"assistant"' | grep -v '"isSidechain":true' | tail -n 1)
-  [ -n "$line" ] || continue
   if [ -n "$has_jq" ]; then
-    tokens=$(printf '%s' "$line" | jq -r '.message.usage // {} | (.input_tokens // 0) + (.cache_read_input_tokens // 0) + (.cache_creation_input_tokens // 0)' 2>/dev/null)
+    r=$(tail -c $(( bytes + 1 )) "$tp" | LC_ALL=C awk -v n="$bytes" "$pick" | jq -r '((.message.usage // {}) | (.input_tokens // 0) + (.cache_read_input_tokens // 0) + (.cache_creation_input_tokens // 0)), (.requestedModel // "" | tostring), "."' 2>/dev/null)
+    tokens=${r%%"$nl"*}; r=${r#*"$nl"}; rmodel=${r%%"$nl"*}
   else
+    line=$(tail -c $(( bytes + 1 )) "$tp" | LC_ALL=C awk -v n="$bytes" "$pick")
+    [ -n "$line" ] || continue
     tokens=$(( $(num input_tokens) + $(num cache_read_input_tokens) + $(num cache_creation_input_tokens) ))
   fi
   case $tokens in ''|0|*[!0-9]*) tokens="" ;; *) break ;; esac
-  [ "$bytes" -lt "$size" ] || break
 done
 [ -n "$tokens" ] || exit 0
 uint() { case $1 in ''|0*|*[!0-9]*|?????????????*) return 1 ;; esac; }  # no leading zero: $(( )) reads 08 as an error, 050 as octal
@@ -43,17 +46,22 @@ if ! uint "$threshold"; then
   { uint "$percent" && [ "$percent" -le 100 ]; } || percent=50
   window=${CONTEXT_THRESHOLD_NOTIFY_WINDOW:-${CLAUDE_PLUGIN_OPTION_WINDOW_TOKENS:-}}
   if ! uint "$window"; then
-    if [ -n "$has_jq" ]; then
-      model=$(printf '%s' "$line" | jq -r '.requestedModel // ""' 2>/dev/null)
-    else
-      model=$(printf '%s' "$line" | grep -o '"requestedModel":"[^"]*"' | head -n 1)
+    window=1000000
+    # Above 200k the window is 1M whatever the model says, so the model is looked up only at or below it.
+    if [ "$tokens" -le 200000 ]; then
+      [ -n "$has_jq" ] || rmodel=$(printf '%s' "$line" | grep -o '"requestedModel":"[^"]*"' | head -n 1)
+      model=$rmodel
+      case $model in *'[1m]'*) ;; *) model=${ANTHROPIC_MODEL:-} ;; esac
+      if [ -z "$model" ]; then
+        set --
+        for f in "$cwd/.claude/settings.local.json" "$cwd/.claude/settings.json" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"; do
+          [ -f "$f" ] && [ -r "$f" ] && set -- "$@" "$f"
+        done
+        # Each file's first "model" counts, as with grep | head -n 1; an empty one falls through to the next file.
+        [ $# -eq 0 ] || model=$(awk 'FNR == 1 { seen = 0 } !seen && match($0, /"model"[[:space:]]*:[[:space:]]*"[^"]*"/) { seen = 1; m = substr($0, RSTART, RLENGTH); sub(/"$/, "", m); sub(/.*"/, "", m); if (m != "") { print m; exit } }' "$@" 2>/dev/null)
+      fi
+      case $model in *'[1m]'*) ;; *) window=200000 ;; esac
     fi
-    case $model in *'[1m]'*) ;; *) model=${ANTHROPIC_MODEL:-} ;; esac
-    for f in "$cwd/.claude/settings.local.json" "$cwd/.claude/settings.json" "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"; do
-      [ -z "$model" ] && [ -f "$f" ] && model=$(grep -o '"model"[[:space:]]*:[[:space:]]*"[^"]*"' "$f" | head -n 1 | sed 's/.*"\([^"]*\)"$/\1/')
-    done
-    case $model in *'[1m]'*) window=1000000 ;; *) window=200000 ;; esac
-    [ "$tokens" -gt 200000 ] && window=1000000
   fi
   threshold=$(( window * percent / 100 ))
 fi

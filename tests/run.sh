@@ -10,7 +10,7 @@ printf '#!/bin/sh\necho "osascript $*" >> "%s/calls"\n' "$tmp" > "$bin/osascript
 stub="$tmp/notifier"; printf '#!/bin/sh\nfor a; do printf "%%s\\n" "$a"; done > "%s/argv.$$"\necho "$@" >> "%s/calls"\n' "$tmp" "$tmp" > "$stub"
 chmod +x "$bin/uname" "$bin/osascript" "$stub"
 nojq="$tmp/nojq"; mkdir "$nojq"
-for c in sh sed grep tail head tr ps basename dirname mkdir cat wc; do ln -s "$(command -v $c)" "$nojq/$c"; done
+for c in sh awk sed grep tail head tr ps basename dirname mkdir cat wc; do ln -s "$(command -v $c)" "$nojq/$c"; done
 ln -s "$bin/uname" "$nojq/uname"; ln -s "$bin/osascript" "$nojq/osascript"
 pass=0 fail=0
 check() { if [ "$2" = "$3" ]; then pass=$((pass+1)); echo "PASS  $1"; else fail=$((fail+1)); echo "FAIL  $1 (want $3, got $2)"; fi; }
